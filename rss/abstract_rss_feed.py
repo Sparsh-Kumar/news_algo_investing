@@ -11,7 +11,7 @@ class AbstractRSSFeed(ABC):
     self.feed = feedparser.parse(self.config.url)
 
   @abstractmethod
-  def get_feed(self):
+  def get_today_feeds(self):
     pass
 
   @abstractmethod
