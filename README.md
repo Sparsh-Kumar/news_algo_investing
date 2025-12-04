@@ -14,6 +14,8 @@ The system continuously monitors RSS feeds from Livemint (market and political n
 - **Duplicate Prevention**: Tracks processed news items to avoid redundant analysis
 - **Scheduled Execution**: Runs automatically every 30 minutes
 - **Data Persistence**: Stores all feeds and LLM responses in MongoDB
+- **Web Dashboard**: Interactive dashboard to view LLM responses and recommendations
+- **REST API**: API server to access today's recommendations programmatically
 
 ## Prerequisites
 
@@ -54,6 +56,8 @@ LIVEMINT_MARKET_RSS_FEED=https://www.livemint.com/rss/markets
 
 ## Usage
 
+### Running the News Advisor
+
 Run the advisor:
 ```bash
 python main.py
@@ -74,17 +78,47 @@ The system will:
 
 Press `Ctrl+C` to stop the scheduler.
 
+### Running the API Server and Dashboard
+
+Start the API server:
+```bash
+python api.py
+```
+
+Or use the provided script:
+```bash
+./scripts/start_api.sh
+```
+
+The server will start on `http://localhost:5000` by default. Access the dashboard at:
+- **Dashboard**: `http://localhost:5000/`
+- **API Endpoint**: `http://localhost:5000/api/llm-responses/today`
+
+**Configuration** (optional environment variables):
+- `FLASK_DEBUG=true` - Enable debug mode (default: false)
+- `FLASK_HOST=0.0.0.0` - Server host (default: 0.0.0.0)
+- `FLASK_PORT=5000` - Server port (default: 5000)
+
+**Dashboard Features**:
+- View today's LLM request/response records
+- Auto-refresh every 30 seconds
+- Manual refresh option
+- Responsive design for mobile and desktop
+
 ## Project Structure
 
 ```
 NewsInvestingAdvisor/
 ├── main.py                 # Main execution script
+├── api.py                  # Flask API server
+├── dashboard/              # Web dashboard (HTML, CSS, JS)
 ├── database/               # MongoDB integration
 ├── portfolio/              # Groww portfolio integration
 ├── rss/                    # RSS feed parsers
 ├── prompts/                # LLM prompt generation
 ├── helpers/                # Utility functions
-└── master/                 # Instrument master data
+├── master/                 # Instrument master data
+└── scripts/                # Startup scripts
 ```
 
 ## How It Works
@@ -122,6 +156,8 @@ Recommendations are returned as JSON arrays:
 - `pandas` - Data manipulation
 - `schedule` - Task scheduling
 - `pyotp` - TOTP authentication
+- `flask` - Web framework for API server
+- `flask-cors` - CORS support for API
 
 ## Notes
 

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News Investing Advisor - Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>News Investing Advisor</h1>
+      <p class="subtitle">LLM Request & Response Dashboard</p>
+      <div class="header-info">
+        <span id="date-display"></span>
+        <span id="count-display">0 responses</span>
+      </div>
+    </header>
+
+    <div class="controls">
+      <button id="refresh-btn" class="btn-primary">Refresh</button>
+      <button id="auto-refresh-btn" class="btn-secondary">Auto-refresh: OFF</button>
+    </div>
+
+    <div id="loading" class="loading">Loading...</div>
+    <div id="error" class="error"></div>
+
+    <div id="responses-container" class="responses-container"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
