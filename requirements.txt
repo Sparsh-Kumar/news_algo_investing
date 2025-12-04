@@ -5,3 +5,4 @@ pandas==2.3.3
 pymongo==4.15.5
 pyotp==2.9.0
 python-dotenv==1.2.1
+schedule==1.2.2

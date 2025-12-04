@@ -1,7 +1,10 @@
 import os
+import time
 import hashlib
 import traceback
+import schedule
 import pandas as pd
+from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import asdict
 from pymongo.collection import Collection
@@ -185,9 +188,11 @@ def main() -> None:
           'role': 'system',
           'content': (
             'You are a professional financial advisor and investment analyst. '
-            'Provide detailed, well-reasoned investment recommendations based on '
-            'portfolio data and market news. Always format your recommendations '
-            'as JSON objects within markdown code blocks.'
+            'Your recommendations must be STRICTLY based on the provided news items. '
+            'Each recommendation must have a direct, explicit connection to a specific news item. '
+            'Do not create recommendations based on general market knowledge or portfolio analysis alone. '
+            'Quality over quantity: Only provide recommendations with strong, actionable connections to the news. '
+            'Return ONLY a valid JSON array - no additional text, explanations, or markdown formatting outside the JSON.'
           )
         },
         {
@@ -214,6 +219,24 @@ def main() -> None:
     traceback.print_exc()
 
 if __name__ == '__main__':
+  schedule.every(30).minutes.do(main)
+  
+  print("=" * 80)
+  print("Macro Investing Advisor - Scheduled Execution")
+  print("=" * 80)
+  print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+  print("Running every 30 minutes...")
+  print("Press Ctrl+C to stop")
+  print("=" * 80 + "\n")
+  
   main()
+  
+  try:
+    while True:
+      schedule.run_pending()
+      time.sleep(60)
+  except KeyboardInterrupt:
+    print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Stopping scheduler...")
+    print("Goodbye!")
 
 
