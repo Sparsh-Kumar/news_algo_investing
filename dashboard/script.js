@@ -2,7 +2,7 @@ const API_URL = '/api/llm-responses/today';
 
 let autoRefreshInterval = null;
 let isAutoRefreshOn = false;
-let isLoading = false; // Prevent concurrent requests
+let isLoading = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupEventListeners() {
   document.getElementById('refresh-btn').addEventListener('click', () => {
-    loadResponses(true); // true = manual refresh
+    loadResponses(true);
   });
   document.getElementById('auto-refresh-btn').addEventListener('click', toggleAutoRefresh);
 }
@@ -31,18 +31,18 @@ function updateDateDisplay() {
 
 function toggleAutoRefresh() {
   const btn = document.getElementById('auto-refresh-btn');
+  const btnText = btn.querySelector('.btn-text');
   isAutoRefreshOn = !isAutoRefreshOn;
 
   if (isAutoRefreshOn) {
-    btn.textContent = 'Auto-refresh: ON';
+    btnText.textContent = 'Auto-refresh: ON';
     btn.classList.add('active');
-    // Start auto-refresh immediately, then every 30 seconds
-    loadResponses(false); // Trigger immediately
+    loadResponses(false);
     autoRefreshInterval = setInterval(() => {
-      loadResponses(false); // false = auto refresh (less intrusive)
+      loadResponses(false);
     }, 30000);
   } else {
-    btn.textContent = 'Auto-refresh: OFF';
+    btnText.textContent = 'Auto-refresh: OFF';
     btn.classList.remove('active');
     if (autoRefreshInterval) {
       clearInterval(autoRefreshInterval);
@@ -52,7 +52,6 @@ function toggleAutoRefresh() {
 }
 
 async function loadResponses(isManualRefresh = false) {
-  // Prevent concurrent requests
   if (isLoading) {
     console.log('Request already in progress, skipping...');
     return;
@@ -64,14 +63,10 @@ async function loadResponses(isManualRefresh = false) {
 
   isLoading = true;
 
-  // For manual refresh, show loading and clear content immediately
-  // For auto-refresh, be less intrusive (don't clear content, show subtle indicator)
   if (isManualRefresh) {
     loadingEl.classList.add('show');
     containerEl.innerHTML = '';
   } else {
-    // For auto-refresh, add a subtle indicator without clearing content
-    loadingEl.textContent = 'Refreshing...';
     loadingEl.classList.add('show');
     loadingEl.style.opacity = '0.7';
   }
@@ -86,61 +81,145 @@ async function loadResponses(isManualRefresh = false) {
       throw new Error(data.error || 'Failed to fetch responses');
     }
 
-    // Update the display
     updateCountDisplay(data.count);
-
-    // Clear and rebuild content
     containerEl.innerHTML = '';
 
     if (data.count === 0) {
       containerEl.innerHTML = `
         <div class="empty-state">
-          <h2>No Responses Today</h2>
-          <p>There are no LLM request/response records for today.</p>
+          <div class="empty-state-icon">📊</div>
+          <h2>No Recommendations Today</h2>
+          <p>There are no trading recommendations available for today.</p>
         </div>
       `;
     } else {
-      data.data.forEach((record, index) => {
-        containerEl.appendChild(createResponseCard(record, index + 1));
+      // Process each record
+      data.data.forEach((record, recordIndex) => {
+        const recommendations = parseRecommendations(record.prompt_response);
+        
+        if (recommendations && recommendations.length > 0) {
+          // Display recommendations
+          recommendations.forEach((rec, index) => {
+            containerEl.appendChild(createRecommendationCard(rec, recordIndex, index));
+          });
+        } else {
+          // If no valid recommendations, show the raw response record
+          containerEl.appendChild(createResponseRecordCard(record, recordIndex));
+        }
       });
     }
 
-    // Hide loading indicator
     loadingEl.classList.remove('show');
-    loadingEl.style.opacity = '1'; // Reset opacity
-    loadingEl.textContent = 'Loading...'; // Reset text
+    loadingEl.style.opacity = '1';
   } catch (error) {
     loadingEl.classList.remove('show');
-    loadingEl.style.opacity = '1'; // Reset opacity
-    loadingEl.textContent = 'Loading...'; // Reset text
+    loadingEl.style.opacity = '1';
     
-    // Only show error for manual refreshes or if container is empty
     if (isManualRefresh || containerEl.innerHTML === '') {
       errorEl.textContent = `Error: ${error.message}`;
       errorEl.classList.add('show');
     } else {
-      // For auto-refresh errors, log but don't disrupt the UI
       console.error('Auto-refresh error:', error);
-      // Show a subtle notification that refresh failed
-      const errorMsg = document.createElement('div');
-      errorMsg.className = 'auto-refresh-error';
-      errorMsg.textContent = 'Auto-refresh failed. Click Refresh to try again.';
-      errorMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #fee; color: #c33; padding: 12px 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 1000; font-size: 14px;';
-      document.body.appendChild(errorMsg);
-      setTimeout(() => errorMsg.remove(), 5000);
+      showNotification('Auto-refresh failed. Click Refresh to try again.', 'error');
     }
   } finally {
     isLoading = false;
   }
 }
 
-function updateCountDisplay(count) {
-  document.getElementById('count-display').textContent = `${count} response${count !== 1 ? 's' : ''}`;
+function parseRecommendations(responseText) {
+  if (!responseText) return null;
+  
+  try {
+    // Try to parse as JSON
+    const json = JSON.parse(responseText);
+    
+    // Check if it's an array
+    if (Array.isArray(json) && json.length > 0) {
+      return json;
+    }
+    
+    // Check if it's wrapped in markdown code blocks
+    const codeBlockMatch = responseText.match(/```(?:json)?\s*(\[.*?\])\s*```/s);
+    if (codeBlockMatch) {
+      return JSON.parse(codeBlockMatch[1]);
+    }
+    
+    return null;
+  } catch (e) {
+    // Try to extract JSON array from text
+    const arrayMatch = responseText.match(/\[[\s\S]*\]/);
+    if (arrayMatch) {
+      try {
+        return JSON.parse(arrayMatch[0]);
+      } catch (e2) {
+        console.error('Failed to parse recommendations:', e2);
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
-function createResponseCard(record, index) {
+function createRecommendationCard(recommendation, recordIndex, index) {
   const card = document.createElement('div');
-  card.className = 'response-card';
+  card.className = 'recommendation-card';
+
+  const newsType = recommendation.news_summary_segment || 'MARKET_NEWS';
+  const confidence = recommendation.confidence_on_trading_idea || 0;
+  const tradingIdea = recommendation.trading_idea || '';
+  const newsRef = recommendation.news_summary_referenced || '';
+
+  // Determine if it's BUY or SELL
+  const isBuy = tradingIdea.toUpperCase().includes('BUY');
+  const isSell = tradingIdea.toUpperCase().includes('SELL');
+
+  // Confidence level
+  let confidenceClass = 'low';
+  if (confidence >= 7) confidenceClass = 'high';
+  else if (confidence >= 4) confidenceClass = 'medium';
+
+  // Format trading idea (remove BUY/SELL prefix for cleaner display)
+  const tradingIdeaText = tradingIdea
+    .replace(/^(BUY|SELL):\s*/i, '')
+    .trim();
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="card-meta">
+        <div class="card-time">Recommendation #${index + 1}</div>
+        <span class="news-type-badge ${newsType === 'MARKET_NEWS' ? 'market' : 'political'}">
+          ${newsType === 'MARKET_NEWS' ? 'Market News' : 'Political News'}
+        </span>
+      </div>
+      <div class="confidence-score">
+        <span>Confidence</span>
+        <div class="confidence-bar">
+          <div class="confidence-fill ${confidenceClass}" style="width: ${confidence * 10}%"></div>
+        </div>
+        <span>${confidence}/10</span>
+      </div>
+    </div>
+    <div class="card-content">
+      <div class="trading-idea ${isBuy ? 'buy' : isSell ? 'sell' : ''}">
+        <span class="trading-idea-label">${isBuy ? 'BUY' : isSell ? 'SELL' : 'TRADE'}</span>
+        ${escapeHtml(tradingIdeaText)}
+      </div>
+      ${newsRef ? `
+        <div class="news-reference">
+          <div class="news-reference-label">Referenced News</div>
+          ${escapeHtml(newsRef)}
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  return card;
+}
+
+function createResponseRecordCard(record, index) {
+  const card = document.createElement('div');
+  card.className = 'response-record-card';
 
   const createdAt = record.created_at
     ? new Date(record.created_at).toLocaleString('en-US', {
@@ -156,29 +235,27 @@ function createResponseCard(record, index) {
   const recordId = record._id || 'N/A';
 
   card.innerHTML = `
-    <div class="response-header">
+    <div class="response-record-header">
       <div>
-        <div class="response-time">${createdAt}</div>
-        <div class="response-id">ID: ${recordId}</div>
+        <div class="response-record-time">${createdAt}</div>
+        <div class="response-record-id">ID: ${recordId}</div>
       </div>
     </div>
-    <div class="section">
-      <div class="section-title">
-        <span>📝</span>
-        <span>Prompt</span>
-      </div>
-      <div class="section-content">${escapeHtml(record.prompt || 'No prompt available')}</div>
+    <div class="response-section">
+      <div class="response-section-title">Prompt</div>
+      <div class="response-section-content">${escapeHtml(record.prompt || 'No prompt available')}</div>
     </div>
-    <div class="section">
-      <div class="section-title">
-        <span>🤖</span>
-        <span>Response</span>
-      </div>
-      <div class="section-content">${formatResponse(record.prompt_response || 'No response available')}</div>
+    <div class="response-section">
+      <div class="response-section-title">Response</div>
+      <div class="response-section-content">${formatResponse(record.prompt_response || 'No response available')}</div>
     </div>
   `;
 
   return card;
+}
+
+function updateCountDisplay(count) {
+  document.getElementById('count-display').textContent = count;
 }
 
 function escapeHtml(text) {
@@ -188,13 +265,63 @@ function escapeHtml(text) {
 }
 
 function formatResponse(text) {
-  // Try to parse as JSON and format it nicely
   try {
     const json = JSON.parse(text);
     return escapeHtml(JSON.stringify(json, null, 2));
   } catch (e) {
-    // If not JSON, just escape and return
     return escapeHtml(text);
   }
 }
+
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = 'notification';
+  notification.textContent = message;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${type === 'error' ? '#fee' : '#e0f2fe'};
+    color: ${type === 'error' ? '#991b1b' : '#0c4a6e'};
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    font-size: 14px;
+    font-weight: 500;
+    animation: slideIn 0.3s ease;
+  `;
+  
+  document.body.appendChild(notification);
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 5000);
+}
+
+// Add animation styles
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+`;
+document.head.appendChild(style);
 

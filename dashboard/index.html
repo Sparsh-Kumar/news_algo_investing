@@ -7,28 +7,54 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>News Investing Advisor</h1>
-      <p class="subtitle">LLM Request & Response Dashboard</p>
-      <div class="header-info">
-        <span id="date-display"></span>
-        <span id="count-display">0 responses</span>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-content">
+        <div class="header-main">
+          <h1 class="app-title">News Investing Advisor</h1>
+          <p class="app-subtitle">AI-Powered Trading Recommendations</p>
+        </div>
+        <div class="header-meta">
+          <div class="meta-item">
+            <span class="meta-label">Date</span>
+            <span id="date-display" class="meta-value">—</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Recommendations</span>
+            <span id="count-display" class="meta-value">0</span>
+          </div>
+        </div>
       </div>
     </header>
 
-    <div class="controls">
-      <button id="refresh-btn" class="btn-primary">Refresh</button>
-      <button id="auto-refresh-btn" class="btn-secondary">Auto-refresh: OFF</button>
+    <div class="app-controls">
+      <button id="refresh-btn" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+        </svg>
+        Refresh
+      </button>
+      <button id="auto-refresh-btn" class="btn btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+        <span class="btn-text">Auto-refresh: OFF</span>
+      </button>
     </div>
 
-    <div id="loading" class="loading">Loading...</div>
-    <div id="error" class="error"></div>
+    <div id="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading recommendations...</p>
+    </div>
 
-    <div id="responses-container" class="responses-container"></div>
+    <div id="error" class="error-state"></div>
+
+    <main class="main-content">
+      <div id="responses-container" class="recommendations-grid"></div>
+    </main>
   </div>
 
   <script src="script.js"></script>
 </body>
 </html>
-
