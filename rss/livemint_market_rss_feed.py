@@ -1,8 +1,9 @@
 import os
+import json
+import logging
 import feedparser
 from datetime import datetime
 from typing import List, Optional
-from pprint import pprint
 from dotenv import load_dotenv
 from email.utils import parsedate_to_datetime
 
@@ -10,6 +11,13 @@ from helpers.types import RSSFeedConfig
 from rss.abstract_rss_feed import AbstractRSSFeed
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 class LivemintMarketRSSFeed(AbstractRSSFeed):
   def get_today_feeds(self) -> List[feedparser.FeedParserDict]:
@@ -43,6 +51,6 @@ if __name__ == '__main__':
   rss_feed = LivemintMarketRSSFeed(config=config)
   feed_entries = rss_feed.get_today_feeds()
   parsed_feed_entries = rss_feed.parse_feed(feed_entries)
-  pprint(parsed_feed_entries)
+  logger.info(json.dumps(parsed_feed_entries, indent=2, default=str))
 
 

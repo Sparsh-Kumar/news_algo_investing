@@ -38,7 +38,6 @@ def generate_news_based_prompt(llm_input_payload: ResultantLLMInputPayload) -> s
       llm_prompt += f"{i}. {news}\n"
     llm_prompt += "\n"
 
-  # Add instructions for LLM analysis
   llm_prompt += "=" * 80 + "\n"
   llm_prompt += "INVESTMENT ANALYSIS REQUEST\n"
   llm_prompt += "=" * 80 + "\n\n"

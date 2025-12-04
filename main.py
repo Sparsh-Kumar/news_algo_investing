@@ -2,6 +2,7 @@ import os
 import time
 import hashlib
 import traceback
+import logging
 import schedule
 import pandas as pd
 from datetime import datetime
@@ -30,6 +31,13 @@ from database.models.database_models import FeedType, LLMRequestResponseModel
 
 load_dotenv()
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 def calculate_pnl(current_price: float, average_price: float, quantity: float) -> Tuple[float, float]:
   pnl = (current_price - average_price) * quantity
   pnl_percentage = ((current_price - average_price) / average_price) * 100 if average_price > 0 else 0
@@ -52,7 +60,7 @@ def get_portfolio_holdings(
       ]
       
       if instrument_match.empty:
-        print(f"Warning: Instrument {trading_symbol} not found in instruments data. Skipping.")
+        logger.info(f"Warning: Instrument {trading_symbol} not found in instruments data. Skipping.")
         continue
       
       instrument_name: str = instrument_match['name'].iloc[0]
@@ -71,7 +79,7 @@ def get_portfolio_holdings(
         'pnl_percentage': pnl_percentage
       })
     except Exception as e:
-      print(f"Error processing holding {holding.get('trading_symbol', 'unknown')}: {str(e)}")
+      logger.info(f"Error processing holding {holding.get('trading_symbol', 'unknown')}: {str(e)}")
       continue
   
   return holdings
@@ -139,8 +147,8 @@ def main() -> None:
       groww_holdings
     )
   except Exception as e:
-    print(f"Error fetching portfolio holdings: {str(e)}")
-    print("Continuing with empty portfolio holdings...")
+    logger.info(f"Error fetching portfolio holdings: {str(e)}")
+    logger.info("Continuing with empty portfolio holdings...")
     holdings_information_for_llm = []
   
   politics_config = RSSFeedConfig(url=os.getenv('LIVEMINT_POLITICS_RSS_FEED'))
@@ -168,7 +176,7 @@ def main() -> None:
   all_new_feeds = filtered_political_news + filtered_market_news
   
   if not all_new_feeds:
-    print("No new feeds to process. Skipping LLM call.")
+    logger.info("No new feeds to process. Skipping LLM call.")
     return
   
   resultant_payload: ResultantLLMInputPayload = {
@@ -203,7 +211,7 @@ def main() -> None:
     )
     
     response_text = llm_response.choices[0].message.content or ""
-    print(response_text)
+    logger.info(response_text)
     
     mark_feeds_as_processed(all_new_feeds, feed_table_handle)
     save_llm_request_response(
@@ -214,20 +222,20 @@ def main() -> None:
     )
     
   except Exception as e:
-    print(f"Error calling OpenAI API: {str(e)}")
-    print("Make sure you have set OPENAI_API_KEY in your .env file and have access to the model.")
+    logger.info(f"Error calling OpenAI API: {str(e)}")
+    logger.info("Make sure you have set OPENAI_API_KEY in your .env file and have access to the model.")
     traceback.print_exc()
 
 if __name__ == '__main__':
   schedule.every(30).minutes.do(main)
   
-  print("=" * 80)
-  print("News Investing Advisor - Scheduled Execution")
-  print("=" * 80)
-  print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-  print("Running every 30 minutes...")
-  print("Press Ctrl+C to stop")
-  print("=" * 80 + "\n")
+  logger.info("=" * 80)
+  logger.info("News Investing Advisor - Scheduled Execution")
+  logger.info("=" * 80)
+  logger.info(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+  logger.info("Running every 30 minutes...")
+  logger.info("Press Ctrl+C to stop")
+  logger.info("=" * 80 + "\n")
   
   main()
   
@@ -236,7 +244,7 @@ if __name__ == '__main__':
       schedule.run_pending()
       time.sleep(60)
   except KeyboardInterrupt:
-    print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Stopping scheduler...")
-    print("Goodbye!")
+    logger.info(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Stopping scheduler...")
+    logger.info("Goodbye!")
 
 
