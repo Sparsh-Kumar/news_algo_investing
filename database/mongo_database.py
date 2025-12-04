@@ -10,7 +10,7 @@ class MongoDatabase(AbstractDatabase):
   def __init__(self, config: Optional[DatabaseConfig] = None):
     super().__init__(config)
     db_url = self.config.url or 'mongodb://localhost:27017/'
-    db_name = self.config.name or 'macro_investing'
+    db_name = self.config.name or 'news_investing'
     self.client = MongoClient(db_url)
     self.db = self.client[db_name]
 

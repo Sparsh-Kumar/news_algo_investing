@@ -222,7 +222,7 @@ if __name__ == '__main__':
   schedule.every(30).minutes.do(main)
   
   print("=" * 80)
-  print("Macro Investing Advisor - Scheduled Execution")
+  print("News Investing Advisor - Scheduled Execution")
   print("=" * 80)
   print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
   print("Running every 30 minutes...")
