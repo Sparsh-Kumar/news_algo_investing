@@ -5,11 +5,14 @@ from typing import TypedDict, List
 class GrowwConfig:
   auth_token: str
 
-
 @dataclass
 class RSSFeedConfig:
   url: str
 
+@dataclass
+class DatabaseConfig:
+  url: str
+  name: str
 
 class PortfolioHolding(TypedDict):
   instrument_name: str

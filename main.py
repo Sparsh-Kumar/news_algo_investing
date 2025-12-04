@@ -1,93 +1,194 @@
 import os
-import feedparser
+import hashlib
+import traceback
 import pandas as pd
-from typing import List, Dict, Any, Optional
-from pprint import pprint
+from typing import List, Dict, Any, Optional, Tuple
+from dataclasses import asdict
+from pymongo.collection import Collection
 from openai import OpenAI
 from dotenv import load_dotenv
-from helpers.types import GrowwConfig, RSSFeedConfig, ResultantLLMInputPayload, PortfolioHolding, RSSFeedEntry
+
+from helpers.types import (
+  GrowwConfig,
+  RSSFeedConfig,
+  ResultantLLMInputPayload,
+  PortfolioHolding,
+  RSSFeedEntry,
+  DatabaseConfig
+)
 from helpers.generate_groww_access_token import generate_groww_access_token
-from helpers.parse_llm_response import parse_llm_response, format_recommendations
+from helpers.common import filter_unprocessed_feeds
 from portfolio.groww_portfolio import GrowwPortfolio
 from rss.livemint_politics_rss_feed import LivemintPoliticsRSSFeed
 from rss.livemint_market_rss_feed import LivemintMarketRSSFeed
 from prompts.news_based_prompt import generate_news_based_prompt
+from database.mongo_database import MongoDatabase
+from database.models.database_models import FeedType, LLMRequestResponseModel
 
 load_dotenv()
 
+def calculate_pnl(current_price: float, average_price: float, quantity: float) -> Tuple[float, float]:
+  pnl = (current_price - average_price) * quantity
+  pnl_percentage = ((current_price - average_price) / average_price) * 100 if average_price > 0 else 0
+  return pnl, pnl_percentage
+
+def get_portfolio_holdings(
+  groww_portfolio: GrowwPortfolio,
+  instruments_information: pd.DataFrame,
+  groww_holdings: Dict[str, Any]
+) -> List[PortfolioHolding]:
+  holdings: List[PortfolioHolding] = []
+  
+  for holding in groww_holdings.get('holdings', []):
+    try:
+      trading_symbol: str = holding['trading_symbol']
+      current_quote: Optional[Dict[str, Any]] = groww_portfolio.get_current_quote(trading_symbol=trading_symbol)
+      
+      instrument_match = instruments_information[
+        instruments_information['trading_symbol'] == trading_symbol
+      ]
+      
+      if instrument_match.empty:
+        print(f"Warning: Instrument {trading_symbol} not found in instruments data. Skipping.")
+        continue
+      
+      instrument_name: str = instrument_match['name'].iloc[0]
+      quantity: float = holding['quantity']
+      average_price: float = holding['average_price']
+      current_price: float = current_quote.get('last_price', 0) if current_quote else 0
+      
+      pnl, pnl_percentage = calculate_pnl(current_price, average_price, quantity)
+      
+      holdings.append({
+        'instrument_name': instrument_name,
+        'quantity': quantity,
+        'average_price': average_price,
+        'current_price': current_price,
+        'pnl': pnl,
+        'pnl_percentage': pnl_percentage
+      })
+    except Exception as e:
+      print(f"Error processing holding {holding.get('trading_symbol', 'unknown')}: {str(e)}")
+      continue
+  
+  return holdings
+
+def mark_feeds_as_processed(
+  feeds: List[RSSFeedEntry],
+  feed_table_handle: Collection
+) -> None:
+  if not feeds:
+    return
+  
+  title_hashes = [
+    hashlib.sha256(feed['title'].encode()).hexdigest()
+    for feed in feeds
+  ]
+  
+  feed_table_handle.update_many(
+    {'title_hash': {'$in': title_hashes}},
+    {'$set': {'processed': True}}
+  )
+
+def save_llm_request_response(
+  prompt: str,
+  response: str,
+  llm_request_response_handle: Collection,
+  mongodb_database: MongoDatabase
+) -> None:
+  llm_model = LLMRequestResponseModel(
+    prompt=prompt,
+    prompt_response=response
+  )
+  llm_dict = asdict(llm_model)
+  mongodb_database.save_record(llm_request_response_handle, llm_dict)
+
 def main() -> None:
-
-  # Get portfolio holdings
-
-  auth_token: str = generate_groww_access_token(
-    totp_token = os.getenv('GROWW_TOTP_TOKEN'),
-    totp_secret = os.getenv('GROWW_TOTP_SECRET')
+  database_config = DatabaseConfig(
+    url=os.getenv('MONGODB_URI'),
+    name=os.getenv('MONGODB_NAME')
   )
   
-  instruments_information: pd.DataFrame = pd.read_csv(os.path.join(os.path.dirname(__file__), 'master', 'groww_instruments.csv'), low_memory = False)
-  groww_config: GrowwConfig = GrowwConfig(auth_token = auth_token)
-  groww_portfolio: GrowwPortfolio = GrowwPortfolio(config = groww_config)
-  groww_holdings: Dict[str, Any] = groww_portfolio.get_holdings()
-
-  holdings_information_for_llm: List[PortfolioHolding] = []
-
-  for holding in groww_holdings['holdings']:
-    holding_dict: Dict[str, Any] = holding
-    trading_symbol: str = holding_dict['trading_symbol']
-    current_quote: Optional[Dict[str, Any]] = groww_portfolio.get_current_quote(trading_symbol = trading_symbol)
-    instrument_name: str = instruments_information[instruments_information['trading_symbol'] == trading_symbol]['name'].iloc[0]
-    quantity: float = holding_dict['quantity']
-    average_price: float = holding_dict['average_price']
-    current_price: float = current_quote.get('last_price', 0) if current_quote else 0
-
-    pnl: float = (current_price - average_price) * quantity
-    pnl_percentage: float = ((current_price - average_price) / average_price) * 100 if average_price > 0 else 0
-
-    holdings_information_for_llm.append({
-      'instrument_name': instrument_name,
-      'quantity': quantity,
-      'average_price': average_price,
-      'current_price': current_price,
-      'pnl': pnl,
-      'pnl_percentage': pnl_percentage
-    })
+  mongodb_database = MongoDatabase(config=database_config)
+  feed_table_handle = mongodb_database.get_table_handle('feeds')
+  llm_request_response_handle = mongodb_database.get_table_handle('llm_request_responses')
   
-  # Get political news
-
-  livemint_politics_rss_feed_config: RSSFeedConfig = RSSFeedConfig(
-    url = os.getenv('LIVEMINT_POLITICS_RSS_FEED')
+  auth_token = generate_groww_access_token(
+    totp_token=os.getenv('GROWW_TOTP_TOKEN'),
+    totp_secret=os.getenv('GROWW_TOTP_SECRET')
   )
-  livemint_politics_rss_feed: LivemintPoliticsRSSFeed = LivemintPoliticsRSSFeed(config = livemint_politics_rss_feed_config)
-  political_news_feed: List[feedparser.FeedParserDict] = livemint_politics_rss_feed.get_today_feeds()
-  parsed_political_news_feed: List[RSSFeedEntry] = livemint_politics_rss_feed.parse_feed(political_news_feed)
-
-  # Get market news
-
-  livemint_market_rss_feed_config: RSSFeedConfig = RSSFeedConfig(
-    url = os.getenv('LIVEMINT_MARKET_RSS_FEED')
+  
+  instruments_path = os.path.join(
+    os.path.dirname(__file__),
+    'master',
+    'groww_instruments.csv'
   )
-  livemint_market_rss_feed: LivemintMarketRSSFeed = LivemintMarketRSSFeed(config = livemint_market_rss_feed_config)
-  market_news_feed: List[feedparser.FeedParserDict] = livemint_market_rss_feed.get_today_feeds()
-  parsed_market_news_feed: List[RSSFeedEntry] = livemint_market_rss_feed.parse_feed(market_news_feed)
+  instruments_information = pd.read_csv(instruments_path, low_memory=False)
+  
+  groww_config = GrowwConfig(auth_token=auth_token)
+  groww_portfolio = GrowwPortfolio(config=groww_config)
+  
+  try:
+    groww_holdings = groww_portfolio.get_holdings()
+    holdings_information_for_llm = get_portfolio_holdings(
+      groww_portfolio,
+      instruments_information,
+      groww_holdings
+    )
+  except Exception as e:
+    print(f"Error fetching portfolio holdings: {str(e)}")
+    print("Continuing with empty portfolio holdings...")
+    holdings_information_for_llm = []
+  
+  politics_config = RSSFeedConfig(url=os.getenv('LIVEMINT_POLITICS_RSS_FEED'))
+  politics_feed = LivemintPoliticsRSSFeed(config=politics_config)
+  political_news = politics_feed.get_today_feeds()
+  parsed_political_news = politics_feed.parse_feed(political_news)
+  filtered_political_news = filter_unprocessed_feeds(
+    parsed_political_news,
+    FeedType.POLITICAL,
+    feed_table_handle,
+    mongodb_database
+  )
+  
+  market_config = RSSFeedConfig(url=os.getenv('LIVEMINT_MARKET_RSS_FEED'))
+  market_feed = LivemintMarketRSSFeed(config=market_config)
+  market_news = market_feed.get_today_feeds()
+  parsed_market_news = market_feed.parse_feed(market_news)
+  filtered_market_news = filter_unprocessed_feeds(
+    parsed_market_news,
+    FeedType.MARKET,
+    feed_table_handle,
+    mongodb_database
+  )
 
+  all_new_feeds = filtered_political_news + filtered_market_news
+  
+  if not all_new_feeds:
+    print("No new feeds to process. Skipping LLM call.")
+    return
+  
   resultant_payload: ResultantLLMInputPayload = {
     'current_portfolio_holdings': holdings_information_for_llm,
-    'political_news': parsed_political_news_feed,
-    'market_news': parsed_market_news_feed
+    'political_news': filtered_political_news,
+    'market_news': filtered_market_news
   }
-
-  llm_prompt: str = generate_news_based_prompt(resultant_payload)
-  llm_client = OpenAI(
-    api_key = os.getenv('OPENAI_API_KEY')
-  )
-
+  
+  llm_prompt = generate_news_based_prompt(resultant_payload)
+  llm_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+  
   try:
     llm_response = llm_client.chat.completions.create(
-      model = 'gpt-4.1',
-      messages = [
+      model='gpt-4.1',
+      messages=[
         {
           'role': 'system',
-          'content': 'You are a professional financial advisor and investment analyst. Provide detailed, well-reasoned investment recommendations based on portfolio data and market news. Always format your recommendations as JSON objects within markdown code blocks.'
+          'content': (
+            'You are a professional financial advisor and investment analyst. '
+            'Provide detailed, well-reasoned investment recommendations based on '
+            'portfolio data and market news. Always format your recommendations '
+            'as JSON objects within markdown code blocks.'
+          )
         },
         {
           'role': 'user',
@@ -95,12 +196,21 @@ def main() -> None:
         }
       ]
     )
-    response_text: str = llm_response.choices[0].message.content or ""
+    
+    response_text = llm_response.choices[0].message.content or ""
     print(response_text)
+    
+    mark_feeds_as_processed(all_new_feeds, feed_table_handle)
+    save_llm_request_response(
+      llm_prompt,
+      response_text,
+      llm_request_response_handle,
+      mongodb_database
+    )
+    
   except Exception as e:
     print(f"Error calling OpenAI API: {str(e)}")
     print("Make sure you have set OPENAI_API_KEY in your .env file and have access to the model.")
-    import traceback
     traceback.print_exc()
 
 if __name__ == '__main__':
