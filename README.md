@@ -1,4 +1,4 @@
-# Macro Investing Advisor
+# News Investing Advisor
 
 An automated investment advisor that analyzes market and political news to provide AI-powered trading recommendations based on your portfolio holdings.
 
@@ -27,7 +27,7 @@ The system continuously monitors RSS feeds from Livemint (market and political n
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd MacroInvestingAdvisor
+cd NewsInvestingAdvisor
 ```
 
 2. Create a virtual environment:
@@ -77,7 +77,7 @@ Press `Ctrl+C` to stop the scheduler.
 ## Project Structure
 
 ```
-MacroInvestingAdvisor/
+NewsInvestingAdvisor/
 ├── main.py                 # Main execution script
 ├── database/               # MongoDB integration
 ├── portfolio/              # Groww portfolio integration
