@@ -49,15 +49,21 @@ def generate_news_based_prompt(llm_input_payload: ResultantLLMInputPayload) -> s
       llm_prompt += f"   Published: {news['published']}\n\n"
 
   llm_prompt += "=" * 80 + "\n"
-  llm_prompt += "TRADING SIGNAL ANALYSIS\n"
+  llm_prompt += "CHAIN-OF-THOUGHT ANALYSIS\n"
   llm_prompt += "=" * 80 + "\n\n"
   
-  llm_prompt += "Analyze the news above and provide trading signals with clear EDGE explanations.\n\n"
+  llm_prompt += "For each news item, think through these steps:\n\n"
+  llm_prompt += "STEP 1: What is the DIRECT impact?\n"
+  llm_prompt += "STEP 2: What is the INDIRECT/SECOND-ORDER impact that others might miss?\n"
+  llm_prompt += "STEP 3: Is this already priced in? (If news is old or obvious, skip)\n"
+  llm_prompt += "STEP 4: What specific asset benefits or loses?\n"
+  llm_prompt += "STEP 5: What is my EDGE - the insight the market hasn't realized yet?\n\n"
   
-  llm_prompt += "FOR EACH SIGNAL, PROVIDE:\n"
-  llm_prompt += "1. ACTION: What to BUY or SELL (specific asset/stock name)\n"
-  llm_prompt += "2. EDGE: The non-obvious insight - what is the market missing?\n"
-  llm_prompt += "3. NEWS: Include the summary, link, and published date\n\n"
+  llm_prompt += "ONLY CREATE A SIGNAL IF:\n"
+  llm_prompt += "- You identified a genuine second-order effect\n"
+  llm_prompt += "- The insight is non-obvious (retail investors wouldn't think of it)\n"
+  llm_prompt += "- You can name a SPECIFIC tradeable asset\n"
+  llm_prompt += "- Return empty array [] if no strong signals exist\n\n"
   
   total_news_count = len(political_news_list) + len(market_news_list)
   
@@ -66,21 +72,22 @@ def generate_news_based_prompt(llm_input_payload: ResultantLLMInputPayload) -> s
   elif total_news_count == 1:
     max_recommendations = 2
   elif total_news_count <= 3:
-    max_recommendations = 4
+    max_recommendations = 3
   else:
-    max_recommendations = 6
+    max_recommendations = 4
   
   if total_news_count > 0:
-    llm_prompt += f"Provide up to {max_recommendations} high-quality signals.\n\n"
+    llm_prompt += f"Maximum {max_recommendations} signals. Quality over quantity.\n\n"
   
-  llm_prompt += "OUTPUT FORMAT (JSON array only, no other text):\n\n"
+  llm_prompt += "OUTPUT FORMAT (JSON array only):\n\n"
   llm_prompt += "[\n"
   llm_prompt += "  {\n"
-  llm_prompt += '    "news_summary_referenced": "<the news summary>",\n'
-  llm_prompt += '    "news_link": "<the news link URL>",\n'
-  llm_prompt += '    "news_published": "<the published date>",\n'
+  llm_prompt += '    "news_summary_referenced": "<the news>",\n'
+  llm_prompt += '    "news_link": "<URL>",\n'
+  llm_prompt += '    "news_published": "<date>",\n'
   llm_prompt += '    "news_summary_segment": "MARKET_NEWS" or "POLITICAL_NEWS",\n'
-  llm_prompt += '    "trading_idea": "BUY/SELL: <Asset Name>. EDGE: <Your insight>",\n'
+  llm_prompt += '    "reasoning": "<Step 1-5 thinking process>",\n'
+  llm_prompt += '    "trading_idea": "BUY/SELL: <Asset>. EDGE: <Your non-obvious insight>",\n'
   llm_prompt += '    "confidence_on_trading_idea": <1-10>\n'
   llm_prompt += "  }\n"
   llm_prompt += "]\n"

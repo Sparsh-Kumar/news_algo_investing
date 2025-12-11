@@ -171,6 +171,7 @@ function createRecommendationCard(recommendation, recordIndex, index) {
   const newsRef = recommendation.news_summary_referenced || '';
   const newsLink = recommendation.news_link || '';
   const newsPublished = recommendation.news_published || '';
+  const reasoning = recommendation.reasoning || '';
 
   // Determine if it's BUY or SELL
   const isBuy = tradingIdea.toUpperCase().includes('BUY');
@@ -206,6 +207,12 @@ function createRecommendationCard(recommendation, recordIndex, index) {
         <span class="action-label">${isBuy ? 'BUY' : isSell ? 'SELL' : 'TRADE'}</span>
         <span class="asset-name">${escapeHtml(parsed.asset)}</span>
       </div>
+      ${reasoning ? `
+        <div class="reasoning-section">
+          <div class="reasoning-label">Reasoning</div>
+          <div class="reasoning-content">${escapeHtml(reasoning)}</div>
+        </div>
+      ` : ''}
       ${parsed.edge ? `
         <div class="edge-section">
           <div class="edge-label">Edge</div>

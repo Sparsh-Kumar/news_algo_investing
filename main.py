@@ -191,15 +191,14 @@ def main() -> None:
   try:
     llm_response = llm_client.chat.completions.create(
       model='gpt-4.1',
+      temperature=0.3,  # Lower temperature for more focused, analytical reasoning
       messages=[
         {
           'role': 'system',
           'content': (
-            'You are a trading signal analyst. For each signal, provide: '
-            '(1) What to BUY or SELL, '
-            '(2) The EDGE - your non-obvious insight about why this trade works and what the market is missing. '
-            'Think second-order. Do not include entry/exit prices. '
-            'Return ONLY a valid JSON array.'
+            'You are an expert trading analyst. Think step-by-step before each signal. '
+            'Focus on second-order effects and non-obvious insights. '
+            'Only signal when you have genuine edge. Return ONLY valid JSON.'
           )
         },
         {
