@@ -195,12 +195,11 @@ def main() -> None:
         {
           'role': 'system',
           'content': (
-            'You are a professional financial advisor and investment analyst. '
-            'Your recommendations must be STRICTLY based on the provided news items. '
-            'Each recommendation must have a direct, explicit connection to a specific news item. '
-            'Do not create recommendations based on general market knowledge or portfolio analysis alone. '
-            'Quality over quantity: Only provide recommendations with strong, actionable connections to the news. '
-            'Return ONLY a valid JSON array - no additional text, explanations, or markdown formatting outside the JSON.'
+            'You are a trading signal analyst. For each signal, provide: '
+            '(1) What to BUY or SELL, '
+            '(2) The EDGE - your non-obvious insight about why this trade works and what the market is missing. '
+            'Think second-order. Do not include entry/exit prices. '
+            'Return ONLY a valid JSON array.'
           )
         },
         {

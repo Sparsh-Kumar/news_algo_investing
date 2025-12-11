@@ -169,6 +169,8 @@ function createRecommendationCard(recommendation, recordIndex, index) {
   const confidence = recommendation.confidence_on_trading_idea || 0;
   const tradingIdea = recommendation.trading_idea || '';
   const newsRef = recommendation.news_summary_referenced || '';
+  const newsLink = recommendation.news_link || '';
+  const newsPublished = recommendation.news_published || '';
 
   // Determine if it's BUY or SELL
   const isBuy = tradingIdea.toUpperCase().includes('BUY');
@@ -179,21 +181,20 @@ function createRecommendationCard(recommendation, recordIndex, index) {
   if (confidence >= 7) confidenceClass = 'high';
   else if (confidence >= 4) confidenceClass = 'medium';
 
-  // Format trading idea (remove BUY/SELL prefix for cleaner display)
-  const tradingIdeaText = tradingIdea
-    .replace(/^(BUY|SELL):\s*/i, '')
-    .trim();
+  // Parse trading idea to extract asset and edge
+  const parsed = parseSignal(tradingIdea);
+
+  // Format published date
+  const publishedDate = formatPublishedDate(newsPublished);
 
   card.innerHTML = `
     <div class="card-header">
       <div class="card-meta">
-        <div class="card-time">Recommendation #${index + 1}</div>
         <span class="news-type-badge ${newsType === 'MARKET_NEWS' ? 'market' : 'political'}">
-          ${newsType === 'MARKET_NEWS' ? 'Market News' : 'Political News'}
+          ${newsType === 'MARKET_NEWS' ? 'Market' : 'Political'}
         </span>
       </div>
       <div class="confidence-score">
-        <span>Confidence</span>
         <div class="confidence-bar">
           <div class="confidence-fill ${confidenceClass}" style="width: ${confidence * 10}%"></div>
         </div>
@@ -201,20 +202,83 @@ function createRecommendationCard(recommendation, recordIndex, index) {
       </div>
     </div>
     <div class="card-content">
-      <div class="trading-idea ${isBuy ? 'buy' : isSell ? 'sell' : ''}">
-        <span class="trading-idea-label">${isBuy ? 'BUY' : isSell ? 'SELL' : 'TRADE'}</span>
-        ${escapeHtml(tradingIdeaText)}
+      <div class="signal-action ${isBuy ? 'buy' : isSell ? 'sell' : ''}">
+        <span class="action-label">${isBuy ? 'BUY' : isSell ? 'SELL' : 'TRADE'}</span>
+        <span class="asset-name">${escapeHtml(parsed.asset)}</span>
       </div>
+      ${parsed.edge ? `
+        <div class="edge-section">
+          <div class="edge-label">Edge</div>
+          <div class="edge-content">${escapeHtml(parsed.edge)}</div>
+        </div>
+      ` : ''}
       ${newsRef ? `
         <div class="news-reference">
-          <div class="news-reference-label">Referenced News</div>
-          ${escapeHtml(newsRef)}
+          <div class="news-reference-header">
+            <span class="news-reference-label">News</span>
+            ${publishedDate ? `<span class="news-published">${publishedDate}</span>` : ''}
+          </div>
+          ${newsLink ? `
+            <a href="${escapeHtml(newsLink)}" target="_blank" rel="noopener noreferrer" class="news-link">
+              ${escapeHtml(newsRef)}
+            </a>
+          ` : `
+            <div class="news-reference-content">${escapeHtml(newsRef)}</div>
+          `}
         </div>
       ` : ''}
     </div>
   `;
 
   return card;
+}
+
+function formatPublishedDate(dateStr) {
+  if (!dateStr) return '';
+  
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return '';
+  }
+}
+
+function parseSignal(tradingIdea) {
+  let asset = '';
+  let edge = '';
+  
+  if (!tradingIdea) return { asset, edge };
+  
+  // Remove BUY/SELL prefix
+  let text = tradingIdea.replace(/^(BUY|SELL):\s*/i, '').trim();
+  
+  // Check for EDGE: pattern
+  const edgeMatch = text.match(/\.?\s*EDGE:\s*(.+)/i);
+  if (edgeMatch) {
+    edge = edgeMatch[1].trim();
+    asset = text.slice(0, text.indexOf(edgeMatch[0])).trim();
+    // Remove trailing period from asset
+    asset = asset.replace(/\.$/, '').trim();
+  } else {
+    // No EDGE pattern, try to split on first period
+    const periodIndex = text.indexOf('.');
+    if (periodIndex > 0 && periodIndex < 50) {
+      asset = text.slice(0, periodIndex).trim();
+      edge = text.slice(periodIndex + 1).trim();
+    } else {
+      asset = text;
+    }
+  }
+  
+  return { asset, edge };
 }
 
 function createResponseRecordCard(record, index) {

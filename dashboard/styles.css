@@ -404,6 +404,117 @@ body {
   color: white;
 }
 
+/* Signal Action */
+.signal-action {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.signal-action.buy {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+}
+
+.signal-action.sell {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 1px solid #fecaca;
+}
+
+.action-label {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.signal-action.buy .action-label {
+  background: var(--color-success);
+  color: white;
+}
+
+.signal-action.sell .action-label {
+  background: var(--color-danger);
+  color: white;
+}
+
+.asset-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Edge Section */
+.edge-section {
+  padding: var(--spacing-md);
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: var(--radius-sm);
+  border: 1px solid #fcd34d;
+  margin-bottom: var(--spacing-sm);
+}
+
+.edge-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #92400e;
+  margin-bottom: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.edge-label::before {
+  content: '💡';
+  font-size: 14px;
+}
+
+.edge-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #78350f;
+  font-weight: 500;
+}
+
+/* News Reference */
+.news-reference-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.news-published {
+  font-size: 12px;
+  color: var(--color-text-lighter);
+}
+
+.news-reference-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.news-link {
+  display: block;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.news-link:hover {
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+}
+
 /* Empty State */
 .empty-state {
   grid-column: 1 / -1;
