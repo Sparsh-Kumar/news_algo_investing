@@ -8,6 +8,14 @@ from database.mongo_database import MongoDatabase
 
 load_dotenv()
 
+# Single DB connection reused for all requests (PyMongo's MongoClient is thread-safe)
+_database_config = DatabaseConfig(
+  url=os.getenv('MONGODB_URI'),
+  name=os.getenv('MONGODB_NAME')
+)
+_mongodb = MongoDatabase(config=_database_config)
+_llm_handle = _mongodb.get_table_handle('llm_request_responses')
+
 app = Flask(__name__, static_folder='dashboard', static_url_path='')
 # Configure CORS to allow all origins (since dashboard is served from same server, this ensures compatibility)
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
@@ -21,18 +29,12 @@ def get_today_responses():
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
     return response, 200
-  database_config = DatabaseConfig(
-    url = os.getenv('MONGODB_URI'),
-    name = os.getenv('MONGODB_NAME')
-  )
-  mongodb_database = MongoDatabase(config=database_config)
-  llm_handle = mongodb_database.get_table_handle('llm_request_responses')
-  
+
   now = datetime.now(timezone.utc)
   start_of_day = datetime(now.year, now.month, now.day, 0, 0, 0, tzinfo=timezone.utc)
   end_of_day = datetime(now.year, now.month, now.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
   
-  records = list(llm_handle.find({
+  records = list(_llm_handle.find({
     'created_at': {'$gte': start_of_day, '$lte': end_of_day}
   }).sort('created_at', -1))
   

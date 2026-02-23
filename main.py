@@ -13,14 +13,12 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 from helpers.types import (
-  GrowwConfig,
   RSSFeedConfig,
   ResultantLLMInputPayload,
   PortfolioHolding,
   RSSFeedEntry,
   DatabaseConfig
 )
-from helpers.generate_groww_access_token import generate_groww_access_token
 from helpers.common import filter_unprocessed_feeds
 from portfolio.groww_portfolio import GrowwPortfolio
 from rss.livemint_politics_rss_feed import LivemintPoliticsRSSFeed
@@ -124,33 +122,6 @@ def main() -> None:
   feed_table_handle = mongodb_database.get_table_handle('feeds')
   llm_request_response_handle = mongodb_database.get_table_handle('llm_request_responses')
   
-  auth_token = generate_groww_access_token(
-    totp_token=os.getenv('GROWW_TOTP_TOKEN'),
-    totp_secret=os.getenv('GROWW_TOTP_SECRET')
-  )
-  
-  instruments_path = os.path.join(
-    os.path.dirname(__file__),
-    'master',
-    'groww_instruments.csv'
-  )
-  instruments_information = pd.read_csv(instruments_path, low_memory=False)
-  
-  groww_config = GrowwConfig(auth_token=auth_token)
-  groww_portfolio = GrowwPortfolio(config=groww_config)
-  
-  try:
-    groww_holdings = groww_portfolio.get_holdings()
-    holdings_information_for_llm = get_portfolio_holdings(
-      groww_portfolio,
-      instruments_information,
-      groww_holdings
-    )
-  except Exception as e:
-    logger.info(f"Error fetching portfolio holdings: {str(e)}")
-    logger.info("Continuing with empty portfolio holdings...")
-    holdings_information_for_llm = []
-  
   politics_config = RSSFeedConfig(url=os.getenv('LIVEMINT_POLITICS_RSS_FEED'))
   politics_feed = LivemintPoliticsRSSFeed(config=politics_config)
   political_news = politics_feed.get_today_feeds()
@@ -180,7 +151,7 @@ def main() -> None:
     return
   
   resultant_payload: ResultantLLMInputPayload = {
-    'current_portfolio_holdings': holdings_information_for_llm,
+    'current_portfolio_holdings': [],
     'political_news': filtered_political_news,
     'market_news': filtered_market_news
   }
@@ -189,6 +160,10 @@ def main() -> None:
   llm_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
   
   try:
+
+    logger.info(f"LLM Prompt: {llm_prompt}")
+    logger.info(f'Doing a LLM call to generate trading ideas for the day...')
+
     llm_response = llm_client.chat.completions.create(
       model='gpt-4.1',
       temperature=0.3,  # Lower temperature for more focused, analytical reasoning
@@ -196,7 +171,7 @@ def main() -> None:
         {
           'role': 'system',
           'content': (
-            'You are an expert trading analyst. Think step-by-step before each signal. '
+            'You are an expert trading and investing analyst. Think step-by-step before each signal. '
             'Focus on second-order effects and non-obvious insights. '
             'Only signal when you have genuine edge. Return ONLY valid JSON.'
           )
