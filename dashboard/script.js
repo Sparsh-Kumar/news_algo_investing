@@ -93,20 +93,24 @@ async function loadResponses(isManualRefresh = false) {
         </div>
       `;
     } else {
-      // Process each record
+      // Only show records that parse as recommendations; skip unparseable/empty responses
       data.data.forEach((record, recordIndex) => {
         const recommendations = parseRecommendations(record.prompt_response);
-        
         if (recommendations && recommendations.length > 0) {
-          // Display recommendations
           recommendations.forEach((rec, index) => {
             containerEl.appendChild(createRecommendationCard(rec, recordIndex, index));
           });
-        } else {
-          // If no valid recommendations, show the raw response record
-          containerEl.appendChild(createResponseRecordCard(record, recordIndex));
         }
       });
+      if (containerEl.children.length === 0) {
+        containerEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <h2>No Recommendations Today</h2>
+            <p>There are no trading recommendations available for today.</p>
+          </div>
+        `;
+      }
     }
 
     loadingEl.classList.remove('show');
@@ -210,7 +214,7 @@ function createRecommendationCard(recommendation, recordIndex, index) {
       ${reasoning ? `
         <div class="reasoning-section">
           <div class="reasoning-label">Reasoning</div>
-          <div class="reasoning-content">${escapeHtml(reasoning)}</div>
+          <div class="reasoning-content">${formatReasoningForDisplay(reasoning)}</div>
         </div>
       ` : ''}
       ${parsed.edge ? `
@@ -288,43 +292,6 @@ function parseSignal(tradingIdea) {
   return { asset, edge };
 }
 
-function createResponseRecordCard(record, index) {
-  const card = document.createElement('div');
-  card.className = 'response-record-card';
-
-  const createdAt = record.created_at
-    ? new Date(record.created_at).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      })
-    : 'Unknown time';
-
-  const recordId = record._id || 'N/A';
-
-  card.innerHTML = `
-    <div class="response-record-header">
-      <div>
-        <div class="response-record-time">${createdAt}</div>
-        <div class="response-record-id">ID: ${recordId}</div>
-      </div>
-    </div>
-    <div class="response-section">
-      <div class="response-section-title">Prompt</div>
-      <div class="response-section-content">${escapeHtml(record.prompt || 'No prompt available')}</div>
-    </div>
-    <div class="response-section">
-      <div class="response-section-title">Response</div>
-      <div class="response-section-content">${formatResponse(record.prompt_response || 'No response available')}</div>
-    </div>
-  `;
-
-  return card;
-}
-
 function updateCountDisplay(count) {
   document.getElementById('count-display').textContent = count;
 }
@@ -335,13 +302,35 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function formatResponse(text) {
-  try {
-    const json = JSON.parse(text);
-    return escapeHtml(JSON.stringify(json, null, 2));
-  } catch (e) {
-    return escapeHtml(text);
+/**
+ * Parses reasoning text that contains "Step 1:", "Step 2:", etc. and returns HTML
+ * with each step rendered as a separate block for clarity.
+ */
+function formatReasoningForDisplay(reasoningText) {
+  if (!reasoningText || typeof reasoningText !== 'string') return '';
+  const trimmed = reasoningText.trim();
+  if (!trimmed) return '';
+
+  const stepRegex = /(?:Step|STEP)\s*(\d+)\s*:\s*([\s\S]*?)(?=(?:Step|STEP)\s*\d+\s*:|$)/gi;
+  const steps = [];
+  let match;
+  while ((match = stepRegex.exec(trimmed)) !== null) {
+    steps.push({ num: match[1], text: match[2].trim() });
   }
+
+  if (steps.length === 0) {
+    return `<div class="reasoning-step reasoning-step--single"><div class="reasoning-step-content reasoning-step-content--full">${escapeHtml(trimmed)}</div></div>`;
+  }
+
+  return steps
+    .map(
+      (s) =>
+        `<div class="reasoning-step">
+          <div class="reasoning-step-num" aria-label="Step ${escapeHtml(s.num)}">${escapeHtml(s.num)}</div>
+          <div class="reasoning-step-content">${escapeHtml(s.text)}</div>
+        </div>`
+    )
+    .join('');
 }
 
 function showNotification(message, type = 'info') {
