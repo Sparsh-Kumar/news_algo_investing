@@ -303,19 +303,33 @@ function escapeHtml(text) {
 }
 
 /**
- * Parses reasoning text that contains "Step 1:", "Step 2:", etc. and returns HTML
- * with each step rendered as a separate block for clarity.
+ * Parses reasoning text and returns HTML with each step as a separate block.
+ * Supports:
+ * - "Step 1:", "Step 2:", "STEP 1:", etc.
+ * - "1. DIRECT:", "2. INDIRECT:", "3. PRICED IN?:", "4. ASSET:", "5. EDGE:", etc.
  */
 function formatReasoningForDisplay(reasoningText) {
   if (!reasoningText || typeof reasoningText !== 'string') return '';
   const trimmed = reasoningText.trim();
   if (!trimmed) return '';
 
-  const stepRegex = /(?:Step|STEP)\s*(\d+)\s*:\s*([\s\S]*?)(?=(?:Step|STEP)\s*\d+\s*:|$)/gi;
   const steps = [];
+
+  // Try "Step 1:", "STEP 1:", etc.
+  const stepRegex = /(?:Step|STEP)\s*(\d+)\s*:\s*([\s\S]*?)(?=(?:Step|STEP)\s*\d+\s*:|$)/gi;
   let match;
   while ((match = stepRegex.exec(trimmed)) !== null) {
     steps.push({ num: match[1], text: match[2].trim() });
+  }
+
+  // If no match, try "1. LABEL:", "2. INDIRECT:", "3. PRICED IN?:", etc. (number. label: content)
+  if (steps.length === 0) {
+    const numberLabelRegex = /(\d+)\.\s*([^:]+):\s*([\s\S]*?)(?=\d+\.\s*[^:]+:\s*|$)/g;
+    while ((match = numberLabelRegex.exec(trimmed)) !== null) {
+      const label = match[2].trim();
+      const content = match[3].trim();
+      steps.push({ num: match[1], text: content ? `${label}: ${content}` : label });
+    }
   }
 
   if (steps.length === 0) {
